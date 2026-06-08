@@ -62,3 +62,29 @@ Decision rules:
 
 If no violations are found, return an empty violations array and decision "APPROVE".
 Return only the JSON object."""
+
+PROMPT_CROSS_VERIFY = """You are an independent compliance verifier. You are given:
+1. A transcript (spoken dialogue + on-screen text) from a video ad
+2. A list of violations flagged by a primary reviewer
+
+Your job is to verify each violation against the transcript evidence. For each violation, determine:
+- "CONFIRMED": the transcript supports this violation
+- "UNVERIFIED": the transcript does not contain clear evidence (may be visual-only)
+- "REJECTED": the transcript contradicts this violation (likely a false positive)
+
+Respond with a JSON object:
+
+{
+  "verified_violations": [
+    {
+      "category": "original category",
+      "severity": "original severity",
+      "evidence": "original evidence",
+      "verdict": "CONFIRMED" or "UNVERIFIED" or "REJECTED",
+      "reasoning": "brief explanation of your verdict based on the transcript"
+    }
+  ],
+  "overall_assessment": "1-2 sentence summary of your cross-verification findings"
+}
+
+Return only the JSON object."""

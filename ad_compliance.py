@@ -6,7 +6,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from twelvelabs import TwelveLabs
 from concurrent.futures import ThreadPoolExecutor
-from prompts import PROMPT_RELEVANCE, PROMPT_COMPLIANCE
+from anthropic import Anthropic
+from prompts import PROMPT_RELEVANCE, PROMPT_COMPLIANCE, PROMPT_CROSS_VERIFY
 
 
 load_dotenv()
@@ -15,6 +16,9 @@ load_dotenv()
 client = TwelveLabs(api_key=os.getenv("TL_API_KEY"))
 if not client:
     raise RuntimeError("Failed to create TwelveLabs client!")
+
+# Create Anthropic client for cross-verification
+anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # Create ThreadPoolExecutor for concurrent processing
 executor = ThreadPoolExecutor(max_workers=int(os.getenv("MAX_WORKERS", 5)))
@@ -152,6 +156,29 @@ async def analyze_compliance(indexed_asset):
     return json.loads(result_raw)
 
 
+def _cross_verify(violations, transcription):
+    user_message = json.dumps({
+        "transcript_spoken": transcription["spoken"],
+        "transcript_on_screen_text": transcription["on_screen_text"],
+        "violations_to_verify": violations
+    }, ensure_ascii=False)
+
+    response = anthropic_client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        system=PROMPT_CROSS_VERIFY,
+        messages=[{"role": "user", "content": user_message}]
+    )
+    return response.content[0].text
+
+
+async def cross_verify(violations, transcription):
+    print("Cross-verifying violations with Claude...")
+    loop = asyncio.get_event_loop()
+    result_raw = await loop.run_in_executor(executor, _cross_verify, violations, transcription)
+    return json.loads(result_raw)
+
+
 # Process a single video file
 async def process_video_file(video_file: Path, index, semaphore):
     async with semaphore:
@@ -165,11 +192,18 @@ async def process_video_file(video_file: Path, index, semaphore):
                 result["decision"] = "BLOCK"
                 result["decision_reason"] = "Video is off-brief and not relevant to the campaign."
                 result["violations"] = []
+                result["cross_verification"] = None
             else:
                 compliance = await analyze_compliance(indexed_asset)
                 result["decision"] = compliance["decision"]
                 result["decision_reason"] = compliance["decision_reason"]
                 result["violations"] = compliance["violations"]
+
+                if compliance["violations"]:
+                    verification = await cross_verify(compliance["violations"], result["transcription"])
+                    result["cross_verification"] = verification
+                else:
+                    result["cross_verification"] = None
 
             return result
         except Exception as e:
