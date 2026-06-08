@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from twelvelabs import TwelveLabs
 from concurrent.futures import ThreadPoolExecutor
-from prompts import PROMPT_RELEVANCE, PROMPT_COMPLIANCE_1, PROMPT_COMPLIANCE_2, PROMPT_COMPLIANCE_3, PROMPT_COMPLIANCE_4
+from prompts import PROMPT_RELEVANCE, PROMPT_COMPLIANCE
 
 
 load_dotenv()
@@ -63,7 +63,7 @@ async def upload_video_file(video_file: Path):
     asset = next((a for a in assets if a.filename == video_file.name), None)
     if asset is None:
         loop = asyncio.get_event_loop()
-        asset = await loop.run_in_executor(executor, _upload, video_file, client)
+        asset = await loop.run_in_executor(executor, _upload, video_file)
     else:
         print(f"Asset already exists: id={asset.id} for file {video_file.name}")
     return asset
@@ -124,17 +124,32 @@ async def detect_campaign_relevance(filename: str, indexed_asset):
         relevance = "OFF-BRIEF"
 
     return {
-        "File Name": filename,
-        "Asset ID": indexed_asset.asset_id,
-        "Indexed Asset ID": indexed_asset.id,
-        "Campaign Relevance": relevance,
-        "Relevance Score": result["score"],
-        "Description": result["summary"],
+        "filename": filename,
+        "asset_id": indexed_asset.asset_id,
+        "indexed_asset_id": indexed_asset.id,
+        "campaign_relevance": relevance,
+        "relevance_score": result["score"],
+        "video_description": result["summary"],
         "transcription": {
             "spoken": result["transcription"]["spoken"],
             "on_screen_text": result["transcription"]["on_screen_text"]
         }
     }
+
+
+def _analyze_compliance(indexed_asset):
+    text = client.analyze(
+        video_id=indexed_asset.id,
+        prompt=PROMPT_COMPLIANCE
+    )
+    return text.data
+
+
+async def analyze_compliance(indexed_asset):
+    print("Analyzing compliance risks...")
+    loop = asyncio.get_event_loop()
+    result_raw = await loop.run_in_executor(executor, _analyze_compliance, indexed_asset)
+    return json.loads(result_raw)
 
 
 # Process a single video file
@@ -144,45 +159,21 @@ async def process_video_file(video_file: Path, index, semaphore):
         try:
             asset = await upload_video_file(video_file)
             indexed_asset = await index_video_file(index, asset)
-            return await detect_campaign_relevance(video_file.name, indexed_asset)
+            result = await detect_campaign_relevance(video_file.name, indexed_asset)
+
+            if result["campaign_relevance"] == "OFF-BRIEF":
+                result["decision"] = "BLOCK"
+                result["decision_reason"] = "Video is off-brief and not relevant to the campaign."
+                result["violations"] = []
+            else:
+                compliance = await analyze_compliance(indexed_asset)
+                result["decision"] = compliance["decision"]
+                result["decision_reason"] = compliance["decision_reason"]
+                result["violations"] = compliance["violations"]
+
+            return result
         except Exception as e:
             print(f"Error processing {video_file.name}: {e}")
-
-
-def _analyze_compliance_risks(index, query_text):
-    return client.search.query(
-        index_id=index.id,
-        query_text=query_text,
-        search_options=["visual", "audio", "transcription"],
-        operator="or",
-        transcription_options=["lexical", "semantic"]
-    )
-
-
-def _print_clips(clips, prompt: str):
-    print(f"Found {len(list(clips))} clip(s): {prompt}")
-
-    for i, clip in enumerate(clips):
-        print(f"Result {i + 1}")
-        print(f"  Video ID: {clip.video_id}")
-        print(f"  Rank: {clip.rank}")
-        print(f"  Time: {clip.start}s - {clip.end}s")
-
-
-async def analyze_compliance_risks(index):
-    print(f"Analyzing compliance risks for index: {index.id}")
-
-    loop = asyncio.get_event_loop()
-
-    results_1 = await loop.run_in_executor(executor, _analyze_compliance_risks, index, PROMPT_COMPLIANCE_1)
-    results_2 = await loop.run_in_executor(executor, _analyze_compliance_risks, index, PROMPT_COMPLIANCE_2)
-    results_3 = await loop.run_in_executor(executor, _analyze_compliance_risks, index, PROMPT_COMPLIANCE_3)
-    results_4 = await loop.run_in_executor(executor, _analyze_compliance_risks, index, PROMPT_COMPLIANCE_4)
-
-    _print_clips(results_1, PROMPT_COMPLIANCE_1)
-    _print_clips(results_2, PROMPT_COMPLIANCE_2)
-    _print_clips(results_3, PROMPT_COMPLIANCE_3)
-    _print_clips(results_4, PROMPT_COMPLIANCE_4)
 
 
 async def main():
@@ -200,10 +191,8 @@ async def main():
 
     # Print results
     for result in results:
-        print(f"{json.dumps(result, indent=2, ensure_ascii=False)}")
-
-    # Analyze compliance risks across all videos in the index
-    analysis = await analyze_compliance_risks(index)
+        if result:
+            print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

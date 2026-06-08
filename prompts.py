@@ -29,7 +29,36 @@ Evaluate the video and respond with a JSON object using exactly these fields:
 
 Return only the JSON object. Do not include any explanation or text outside the JSON."""
 
-PROMPT_COMPLIANCE_1 = "hate, harassment, or discriminatory language"
-PROMPT_COMPLIANCE_2 = "drug use or illegal behavior"
-PROMPT_COMPLIANCE_3 = "profanity"
-PROMPT_COMPLIANCE_4 = "misleading or unsafe makeup product usage (e.g. eye-area misuse, harmful claims)"
+PROMPT_COMPLIANCE = """You are an Ad Compliance Reviewer for a social media platform. Analyze this video for policy violations across these categories:
+
+1. hate_harassment: hate speech, harassment, discriminatory language
+2. drugs_illegal: drug use, illegal behavior, substance abuse
+3. profanity: profanity, explicit language, offensive slurs
+4. unsafe_product_usage: misleading or unsafe makeup/cosmetic product usage (e.g. applying lip product near eyes, harmful DIY techniques)
+5. medical_claims: unsubstantiated medical or cosmetic claims (e.g. "cures acne", "removes wrinkles permanently")
+
+For each category, evaluate both visual content and spoken/on-screen text.
+
+Respond with a JSON object using exactly these fields:
+
+{
+  "violations": [
+    {
+      "category": "one of the 5 category keys above",
+      "severity": "low" or "medium" or "high",
+      "timestamp_start": start time in seconds (float),
+      "timestamp_end": end time in seconds (float),
+      "evidence": "brief description of what was detected"
+    }
+  ],
+  "decision": "APPROVE" or "REVIEW" or "BLOCK",
+  "decision_reason": "1-2 sentence explanation of the overall decision"
+}
+
+Decision rules:
+- BLOCK: any high severity violation
+- REVIEW: any medium severity violation and no high
+- APPROVE: only low or no violations
+
+If no violations are found, return an empty violations array and decision "APPROVE".
+Return only the JSON object."""
