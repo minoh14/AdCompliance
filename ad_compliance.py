@@ -164,7 +164,7 @@ def _cross_verify(violations, transcription):
     }, ensure_ascii=False)
 
     response = anthropic_client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-8",
         max_tokens=1024,
         system=PROMPT_CROSS_VERIFY,
         messages=[{"role": "user", "content": user_message}]
