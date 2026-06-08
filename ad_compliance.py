@@ -112,14 +112,10 @@ def _detect_campaign_relevance(indexed_asset):
 
 
 # Analyze indexed asset for campaign relevance and retrieve description
-async def detect_campaign_relevance(indexed_asset):
+async def detect_campaign_relevance(filename: str, indexed_asset):
+    print("Detecting campaign relevance...")
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(executor, _detect_campaign_relevance, indexed_asset)
-
-
-async def retrieve_description(indexed_asset):
-    print("Retrieving video description...")
-    result_raw = await detect_campaign_relevance(indexed_asset)
+    result_raw = await loop.run_in_executor(executor, _detect_campaign_relevance, indexed_asset)
     result = json.loads(result_raw)
 
     if result["is_relevant"].upper() == "YES":
@@ -128,20 +124,23 @@ async def retrieve_description(indexed_asset):
         relevance = "OFF-BRIEF"
 
     return {
+        "File Name": filename,
+        "Asset ID": indexed_asset.asset_id,
+        "Indexed Asset ID": indexed_asset.id,
         "Campaign Relevance": relevance,
         "Relevance Score": result["score"],
         "Description": result["summary"],
     }
 
 
-# Process a single video file: upload, index, and retirieve description
+# Process a single video file
 async def process_video_file(video_file: Path, index, semaphore):
     async with semaphore:
         print(f"Processing file: {video_file.name}")
         try:
             asset = await upload_video_file(video_file)
             indexed_asset = await index_video_file(index, asset)
-            return await retrieve_description(indexed_asset)
+            return await detect_campaign_relevance(video_file.name, indexed_asset)
         except Exception as e:
             print(f"Error processing {video_file.name}: {e}")
 
@@ -173,8 +172,8 @@ async def main():
     )
 
     # Print results
-    for video_file, result in zip(video_files, results):
-        print(f"{video_file.name}: {json.dumps(result, indent=2, ensure_ascii=False)}")
+    for result in results:
+        print(f"{json.dumps(result, indent=2, ensure_ascii=False)}")
 
     # Analyze compliance risks across all videos in the index
     #analysis = analyze_compliance_risks(index)
