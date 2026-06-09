@@ -68,9 +68,9 @@ PROMPT_CROSS_VERIFY = """You are an independent compliance verifier. You are giv
 2. A list of violations flagged by a primary reviewer
 
 Your job is to verify each violation against the transcript evidence. For each violation, determine:
-- "CONFIRMED": the transcript supports this violation
-- "UNVERIFIED": the transcript does not contain clear evidence (may be visual-only)
-- "REJECTED": the transcript contradicts this violation (likely a false positive)
+- "SUPPORTED": the transcript supports this violation
+- "INSUFFICIENT": the transcript does not contain clear evidence (may be visual-only)
+- "CONTRADICTED": the transcript contradicts this violation (likely a false positive)
 
 Respond with a JSON object:
 
@@ -80,8 +80,8 @@ Respond with a JSON object:
       "category": "original category",
       "severity": "original severity",
       "evidence": "original evidence",
-      "verdict": "CONFIRMED" or "UNVERIFIED" or "REJECTED",
-      "reasoning": "brief explanation of your verdict based on the transcript"
+      "verdict": "SUPPORTED" or "INSUFFICIENT" or "CONTRADICTED",
+      "reasoning": "brief explanation citing specific transcript content"
     }
   ],
   "overall_assessment": "1-2 sentence summary of your cross-verification findings"

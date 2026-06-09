@@ -173,7 +173,7 @@ def _cross_verify(violations, transcription):
 
 
 async def cross_verify(violations, transcription):
-    print("Cross-verifying violations with Claude...")
+    print("Cross-verifying violations...")
     loop = asyncio.get_event_loop()
     result_raw = await loop.run_in_executor(executor, _cross_verify, violations, transcription)
     return json.loads(result_raw)
