@@ -68,7 +68,7 @@ Upload and indexing are **idempotent** — re-running on the same folder skips a
 ### Install
 
 ```bash
-git clone https://github.com/<your-username>/AdCompliance.git
+git clone https://github.com/minoh14/AdCompliance.git
 cd AdCompliance
 
 python -m venv .venv
