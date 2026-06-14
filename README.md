@@ -166,7 +166,6 @@ AdCompliance/
 
 | Model             | Options       | Role                                      |
 | ----------------- | ------------- | ----------------------------------------- |
-| `marengo3.0`      | visual, audio | Multimodal embedding backbone             |
 | `pegasus1.2`      | visual, audio | Relevance detection + compliance scanning |
 | `claude-opus-4-8` | —             | Cross-verification of flagged violations  |
 
