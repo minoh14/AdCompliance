@@ -179,6 +179,28 @@ async def cross_verify(violations, transcription):
     return json.loads(result_raw)
 
 
+# After cross-verification, return one of "APPROVE", "REVIEW", "BLOCK".
+#   APPROVE: No violations, or low severity only
+#   REVIEW: Any medium-severity violation (no high)
+#   BLOCK: Any high-severity violation
+def get_final_decision(violations):
+    need_review = False
+    for v in violations:
+        if v["verdict"].upper() == "SUPPORTED":
+            if v["severity"].upper() == "HIGH":
+                return "BLOCK"  # short-circuit, stop inspection here
+            elif v["severity"].upper() == "MEDIUM":
+                need_review = True
+        else:  # INSUFFICIENT or CONTRADICTED
+            if v["severity"].upper() != "LOW":  # Low severity does not require human review
+                need_review = True
+
+    if need_review:
+        return "REVIEW"
+    else:
+        return "APPROVE"
+
+
 # Process a single video file
 async def process_video_file(video_file: Path, index, semaphore):
     async with semaphore:
@@ -193,16 +215,17 @@ async def process_video_file(video_file: Path, index, semaphore):
                 result["decision_reason"] = "Video is off-brief and not relevant to the campaign."
                 result["violations"] = []
                 result["cross_verification"] = None
-            else:
+            else:  # ON-BRIEF
                 compliance = await analyze_compliance(indexed_asset)
-                result["decision"] = compliance["decision"]
                 result["decision_reason"] = compliance["decision_reason"]
                 result["violations"] = compliance["violations"]
 
                 if compliance["violations"]:
                     verification = await cross_verify(compliance["violations"], result["transcription"])
+                    result["decision"] = get_final_decision(verification["verified_violations"])
                     result["cross_verification"] = verification
-                else:
+                else:  # No violations
+                    result["decision"] = "APPROVE"
                     result["cross_verification"] = None
 
             return result
