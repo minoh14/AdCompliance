@@ -34,7 +34,7 @@ def create_index(index_name: str):
         index = client.indexes.create(
             index_name=index_name,
             models=[
-                {"model_name": "marengo3.0", "model_options": ["visual", "audio"]},
+                #{"model_name": "marengo3.0", "model_options": ["visual", "audio"]},
                 {"model_name": "pegasus1.2", "model_options": ["visual", "audio"]}
             ]
         )
