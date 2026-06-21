@@ -19,6 +19,8 @@ if not client:
 
 # Create Anthropic client for cross-verification
 anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+if not anthropic_client:
+    raise RuntimeError("Failed to create Anthropic client!")
 
 # Create ThreadPoolExecutor for concurrent processing
 executor = ThreadPoolExecutor(max_workers=int(os.getenv("MAX_WORKERS", 5)))
