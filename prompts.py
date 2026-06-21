@@ -42,49 +42,40 @@ For each category, evaluate both visual content and spoken/on-screen text.
 Respond with a JSON object using exactly these fields:
 
 {
-  "violations": [
+  "violations_pegasus": [
     {
       "category": "one of the 5 category keys above",
-      "severity": "low" or "medium" or "high",
+      "severity_pegasus": "LOW" or "MEDIUM" or "HIGH",
+      "evidence_pegasus": "brief description of what was detected",
       "timestamp_start": start time in seconds (float),
-      "timestamp_end": end time in seconds (float),
-      "evidence": "brief description of what was detected"
+      "timestamp_end": end time in seconds (float)
     }
-  ],
-  "decision": "APPROVE" or "REVIEW" or "BLOCK",
-  "decision_reason": "1-2 sentence explanation of the overall decision"
+  ]
 }
 
-Decision rules:
-- BLOCK: any high severity violation
-- REVIEW: any medium severity violation and no high
-- APPROVE: only low or no violations
-
-If no violations are found, return an empty violations array and decision "APPROVE".
+If no violations are found, return an empty violations array.
 Return only the JSON object."""
 
 PROMPT_CROSS_VERIFY = """You are an independent compliance verifier. You are given:
 1. A transcript (spoken dialogue + on-screen text) from a video ad
 2. A list of violations flagged by a primary reviewer
 
-Your job is to verify each violation against the transcript evidence. For each violation, determine:
-- "SUPPORTED": the transcript supports this violation
-- "INSUFFICIENT": the transcript does not contain clear evidence (may be visual-only)
-- "CONTRADICTED": the transcript contradicts this violation (likely a false positive)
+Your job is to analyze each violation against the transcript evidence.
 
 Respond with a JSON object:
 
 {
-  "verified_violations": [
+  "violations": [
     {
       "category": "original category",
-      "severity": "original severity",
-      "evidence": "original evidence",
-      "verdict": "SUPPORTED" or "INSUFFICIENT" or "CONTRADICTED",
-      "reasoning": "brief explanation citing specific transcript content"
+      "severity_pegasus": "original severity",
+      "evidence_pegasus": "original evidence",
+      "severity_claude": "LOW" or "MEDIUM" or "HIGH",
+      "evidence_claude": "brief description of what was detected",
+      "timestamp_start": original timestamp (start),
+      "timestamp_end": original timestamp (end)
     }
-  ],
-  "overall_assessment": "1-2 sentence summary of your cross-verification findings"
+  ]
 }
 
 Return only the JSON object."""

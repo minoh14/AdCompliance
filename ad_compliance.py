@@ -182,24 +182,26 @@ async def cross_verify(violations, transcription):
 
 
 # After cross-verification, return one of "APPROVE", "REVIEW", "BLOCK".
-#   APPROVE: No violations, or low severity only
+#   APPROVE: Low severity only
 #   REVIEW: Any medium-severity violation (no high)
 #   BLOCK: Any high-severity violation
 def get_final_decision(violations):
+
     need_review = False
+
     for v in violations:
-        if v["verdict"].upper() == "SUPPORTED":
-            if v["severity"].upper() == "HIGH":
-                return "BLOCK"  # short-circuit, stop inspection here
-            elif v["severity"].upper() == "MEDIUM":
-                need_review = True
-        else:  # INSUFFICIENT or CONTRADICTED
-            if v["severity"].upper() != "LOW":  # Low severity does not require human review
-                need_review = True
+        if v["severity_pegasus"].upper() == "HIGH":
+            return "BLOCK"
+        if v["severity_claude"].upper() == "HIGH":
+            return "BLOCK"
+        if v["severity_pegasus"].upper() == "MEDIUM":
+            need_review = True
+        if v["severity_claude"].upper() == "MEDIUM":
+            need_review = True
 
     if need_review:
         return "REVIEW"
-    else:
+    else:  # All "LOW"
         return "APPROVE"
 
 
@@ -214,21 +216,16 @@ async def process_video_file(video_file: Path, index, semaphore):
 
             if result["campaign_relevance"] == "OFF-BRIEF":
                 result["decision"] = "BLOCK"
-                result["decision_reason"] = "Video is off-brief and not relevant to the campaign."
-                result["violations"] = []
-                result["cross_verification"] = None
+                result["violations"] = None
             else:  # ON-BRIEF
                 compliance = await analyze_compliance(indexed_asset)
-                result["decision_reason"] = compliance["decision_reason"]
-                result["violations"] = compliance["violations"]
-
-                if compliance["violations"]:
-                    verification = await cross_verify(compliance["violations"], result["transcription"])
-                    result["decision"] = get_final_decision(verification["verified_violations"])
-                    result["cross_verification"] = verification
+                if compliance["violations_pegasus"]:
+                    verification = await cross_verify(compliance["violations_pegasus"], result["transcription"])
+                    result["decision"] = get_final_decision(verification["violations"])
+                    result["violations"] = verification["violations"]
                 else:  # No violations
                     result["decision"] = "APPROVE"
-                    result["cross_verification"] = None
+                    result["violations"] = None
 
             return result
         except Exception as e:
